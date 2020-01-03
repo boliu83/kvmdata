@@ -1,0 +1,5 @@
+1. start metadata service
+   node ~/metadata-server/server.js
+
+2. create VM using makemv.sh (transient) and makevm2.sh (permanent) scripts
+   

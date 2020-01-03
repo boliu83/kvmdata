@@ -1,0 +1,10 @@
+- name: open firewall ports
+  firewalld:
+    port: "{{ item }}"
+    zone: public
+    permanent: yes 
+    immediate: yes
+    state: enabled
+  loop:
+    - 10250/tcp
+    - 30000-32767/tcp

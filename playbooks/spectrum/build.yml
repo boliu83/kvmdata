@@ -1,0 +1,7 @@
+---
+- name:  kubernetes deployment
+  hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+    - include: tasks/buildvm.yml

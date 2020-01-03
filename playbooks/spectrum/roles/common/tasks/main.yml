@@ -1,0 +1,114 @@
+- name: install docker dependencies
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: latest
+
+- name: Add Docker-ce repository
+  yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/7/$basearch/stable
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://download.docker.com/linux/centos/gpg
+    state: present
+
+- name: Install docker-ce
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: latest
+
+# https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+- name: create /etc/docker directory
+  file:
+    path: /etc/docker
+    state: directory
+
+- name: setup docker daemon.json
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2",
+        "storage-opts": [
+          "overlay2.override_kernel_check=true"
+        ]
+      }	
+
+- name: create /etc/systemd/system/docker.service.d
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+
+- name: Start docker daemon
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: install firewalld and python2 binding
+  yum:
+    name:
+      - firewalld
+      - python-firewall.noarch
+    state: latest
+
+- name: start firewalld
+  systemd:
+    name: firewalld
+    enabled: yes
+    state: started
+
+- name: add kubernetes repo
+  yum_repository:
+    name: kubernetes
+    baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    description: Kubernetes
+
+- name: install kublet,kubeadm,kubectl
+  yum:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: latest
+    disable_excludes: kubernetes
+
+- name: disable SELinux
+  selinux:
+    policy: targeted
+    state: disabled
+  register: selinux_ret
+
+- name: disable selinux runtime
+  shell: setenforce 0
+  when: selinux_ret["reboot_required"] == true
+
+- name: start 'kubelet' daemon
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+
+- name: set net.bridge.bridge-nf-call-iptables to 1
+  sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes

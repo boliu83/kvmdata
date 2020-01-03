@@ -1,0 +1,9 @@
+[all:vars]
+ansible_ssh_user = centos
+
+[masters]
+master01
+
+[workers]
+worker01
+worker02

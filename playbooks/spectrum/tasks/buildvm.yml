@@ -1,0 +1,73 @@
+- name: create admin node
+  shell:
+    cmd: sh makevm2.sh {{ inventory_hostname }} 2 12
+    chdir: /vmdata
+  when: "'admin' in group_names"
+  delegate_to: localhost
+
+- name: create NSD servers
+  shell:
+    cmd: sh makevm2.sh {{ inventory_hostname }} 2 8
+    chdir: /vmdata
+  when: "'nsdservers' in group_names"
+  delegate_to: localhost
+
+
+- name: wait for hosts to be ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    timeout: 60
+  delegate_to: localhost
+
+- name: create 2nd disk on NSD servers
+  command: chdir=/vmdata {{item}}
+  loop:
+    - mkdir -p spectrumdata
+    - qemu-img create -f raw  spectrumdata/data.img 200G
+#    - qemu-img create -f qcow2 -o preallocation=metadata vm_scale01/scale01-data.qcow2 100G
+#    - qemu-img create -f qcow2 -o preallocation=metadata vm_scale02/scale02-data.qcow2 100G
+#    - qemu-img create -f qcow2 -o preallocation=metadata vm_scale03/scale03-data.qcow2 100G
+    - virsh attach-disk --source /vmdata/spectrumdata/data.img --shareable --target vdb --targetbus virtio --driver qemu --subdriver raw --cache none --type disk --live --persistent scale01
+#    - virsh attach-disk --source /vmdata/spectrumdata/data.img --shareable --target vdb --targetbus virtio --driver qemu --subdriver raw --cache none --type disk --live --persistent scale02
+#    - virsh attach-disk --source /vmdata/spectrumdata/data.img --shareable --target vdb --targetbus virtio --driver qemu --subdriver raw --cache none --type disk --live --persistent scale03
+  delegate_to: localhost
+  run_once: yes
+
+- name: update dnsmasq
+  shell: pkill -HUP dnsmasq
+  delegate_to: localhost
+
+- name: yum update 
+  yum:
+    name: '*'
+    state: latest
+
+- name: install required packages
+  yum:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - gcc
+    - kernel-devel
+    - kernel-headers
+    - kernel
+    - m4
+    - gcc-c++
+    - ksh
+    - numactl
+    - net-tools
+    - openldap-clients
+    - python-lxml
+
+- name: disable SELinux
+  selinux:
+    state: disabled
+
+- name: copy /etc/hosts file
+  copy:
+    src: /etc/hosts
+    dest: /etc/hosts
+
+- name: reboot all nodes
+  reboot:

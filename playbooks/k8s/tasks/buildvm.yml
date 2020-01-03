@@ -1,0 +1,30 @@
+- name: create master nodes
+  shell:
+    cmd: sh makevm.sh {{ inventory_hostname }} 2 4
+    chdir: /vmdata
+  when: "'masters' in group_names"
+  delegate_to: localhost
+
+- name: create worker nodes
+  shell:
+    cmd: sh makevm.sh {{ inventory_hostname }} 4 16
+    chdir: /vmdata
+  when: "'workers' in group_names"
+  delegate_to: localhost
+
+- name: wait for hosts to be ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    timeout: 60
+  delegate_to: localhost
+
+- name: yum update all
+  yum:
+    name: '*'
+    state: latest
+
+- name: reboot hosts
+  reboot:
+
+
